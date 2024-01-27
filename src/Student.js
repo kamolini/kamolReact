@@ -1,7 +1,5 @@
 import React from "react";
-import useAxiosGet from "./Hooks/HttpRequest";
-import axios from "axios";
- 
+import useAxiosGet from "./Hooks/HttpRequest"; 
 
 function Student(){
 
