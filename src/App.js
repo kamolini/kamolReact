@@ -6,7 +6,16 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>Kamolesh</h1>
+        <img 
+          src='./p/k.jpg' 
+          style={{
+            width: 200,
+            height: 200,
+            borderRadius: 100
+          }}>
+
+        </img>
+        <h1>Kamolesh Bachar</h1>
       </header>
       {/* <Student></Student> */}
       <Footer/>
