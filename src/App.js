@@ -1,5 +1,6 @@
 import './App.css';
 import Student from './Student';
+import Footer from './components/Footer';
 
 function App() {
   return (
@@ -7,7 +8,8 @@ function App() {
       <header className="App-header">
         <h1>Kamolesh</h1>
       </header>
-      <Student></Student>
+      {/* <Student></Student> */}
+      <Footer/>
     </div>
   );
 }
