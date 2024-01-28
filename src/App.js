@@ -12,9 +12,10 @@ function App() {
             width: 200,
             height: 200,
             borderRadius: 100
-          }}>
+          }} 
+          alt='Kamolesh Bachar'
+        />
 
-        </img>
         <h1>Kamolesh Bachar</h1>
       </header>
       {/* <Student></Student> */}
