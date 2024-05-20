@@ -10,7 +10,7 @@ function App() {
       <Profile/>
       </header>
       
-      <Student></Student>
+      
       <Footer/>
     </div>
   );
