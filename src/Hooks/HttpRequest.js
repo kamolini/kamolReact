@@ -1,12 +1,16 @@
 import {useState, useEffect} from "react";
 import axios from "axios";
 
+
+
 export default function useAxiosGet(url){
     const [ response, setProducts] = useState({
         loading: false,
         data: null,
         error: false,
     })
+
+    setTimeout(5000)
 
     useEffect(() => {
         setProducts({

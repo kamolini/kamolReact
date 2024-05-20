@@ -1,16 +1,14 @@
 import React from "react";
 import useAxiosGet from "./Hooks/HttpRequest"; 
+import SliderComponent from "./components/SliderComponent";
+import Loader from "./components/Loader";
 
 function Student(){
 
     const url ="http://localhost:8081/api/v1/student/students"
 
     let student = useAxiosGet(url);
-    let content = <p>Getting Student</p>;
-
-    
-
-
+    let content =        <div>||||||||||||||||||</div>     
 
 
     if(student.error){
@@ -20,19 +18,21 @@ function Student(){
 
     if(student.data){
         content =  
-                student.data.map((student)=>
-                    <div key={student.id}>
-                        <span> {student.id}</span>
-                        <span> {student.email}</span>
+            student.data.map((student)=>
+                <div key={student.id}>
+                    <span> {student.id} </span>
+                    <span> {student.email} </span>
+                
                     
-                        
-                    </div>
-                )
+                </div>
+            )
             
-        
     }
     return(
-        <div>{content}</div>
+        <div>
+            {content}
+            <SliderComponent></SliderComponent>
+        </div>
     )
 
 }

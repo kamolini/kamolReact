@@ -1,5 +1,5 @@
 import './App.css';
-//import Student from './Student';
+import Student from './Student';
 import Footer from './components/Footer';
 import Profile from './components/Profile';
 
@@ -10,7 +10,7 @@ function App() {
       <Profile/>
       </header>
       
-      {/* <Student></Student> */}
+      <Student></Student>
       <Footer/>
     </div>
   );

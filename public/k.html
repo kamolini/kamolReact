@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Kamol</title>
+    </head>
+    <body>
+
+        <code>
+
+            package com.kamol;
+
+import org.testng.*;
+import org.testng.collections.Lists;
+import org.testng.log4testng.Logger;
+import org.testng.xml.XmlSuite;
+
+import java.awt.*;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+public class ReportListener implements IReporter {
+
+    private static final Logger LOG = Logger.getLogger(ReportListener.class);
+    protected final List<ReportListener.SuiteResult> suiteResults = Lists.newArrayList();
+    private final StringBuilder reportContent = new StringBuilder();
+    private String fileName = "test-report.html";
+
+
+    int totalPassedTests = 0;
+    int totalSkippedTests = 0;
+    int totalFailedTests = 0;
+    int totalRetriedTests = 0;
+    long totalDuration = 0L;
+
+    public ReportListener(){
+
+    }
+
+    @Override
+    public void generateReport(List<XmlSuite> xmlSuites, List<ISuite> suites, String outputDirectory){
+
+        for (ISuite suite : suites) {
+            this.suiteResults.add(new SuiteResult(suite));
+        }
+
+        reportContent.append(head());
+
+        StringBuilder summery = summaryTable();
+
+        reportContent.append(reportHeadTable());
+        reportContent.append(summery);
+        reportContent.append(details());
+        reportContent.append(end());
+
+        try {
+            writeToFile(reportContent.toString());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private String head(){
+        return   "<!DOCTYPE html>\n" +
+                "<html>\n" +
+                "<head>\n" +
+                "    <script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>\n" +
+                "    <script type=\"text/javascript\">\n" +
+                "      google.charts.load(\"current\", {packages:[\"corechart\"]});\n" +
+                "      google.charts.setOnLoadCallback(drawChart);\n" +
+                "      function drawChart() {\n" +
+                "        var data = google.visualization.arrayToDataTable([\n" +
+                "          ['Task', 'Hours per Day'],\n" +
+                "          ['Pass',     11 ],\n" +
+                "          ['Fail',      2],\n" +
+                "          ['Skip',  2]\n" +
+                "        ]);\n" +
+                "        var options = {\n" +
+                "          is3D: true,\n" +
+                "          legend: 'none',\n" +
+                "\t\t   colors: ['green', 'red', 'gray']\n" +
+                "        };\n" +
+                "        var chart = new google.visualization.PieChart(document.getElementById('piechart_3d'));\n" +
+                "        chart.draw(data, options);\n" +
+                "      }\n" +
+                "    </script>\n" +
+                "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n" +
+                "    <style>\n" +
+                "    .rt {\n" +
+                "      font-family: Arial, Helvetica, sans-serif;\n" +
+                "      border-collapse: collapse;\n" +
+                "      width: 98%;\n" +
+                "      margin-left: auto;\n" +
+                "      margin-right: auto;\n" +
+                "    }\n" +
+                "    .rt th {\n" +
+                "      padding-top: 4px;\n" +
+                "      padding-bottom: 4px;\n" +
+                "      text-align: left;\n" +
+                "      padding: 4px;\n" +
+                "      color: white;\n" +
+                "      border: 1px solid #ddd;\n" +
+                "      background-color: #666699;\n" +
+                "    }\n" +
+                "    .p td{\n" +
+                "        padding: 4px;\n" +
+                "    }\n" +
+                "    .p1{" +
+                "       padding: 4px;" +
+                "       }" +
+                "    .btd td {\n" +
+                "      border: 1px solid #ddd;\n" +
+                "    }\n" +
+                "    .btr tr {\n" +
+                "      border: 1px solid #ddd;\n" +
+                "      padding: 4px;\n" +
+                "    }\n" +
+                "    .m {\n" +
+                "        margin-left: 25px;\n" +
+                "    }\n" +
+                "    .Failed{\n" +
+                "        background-color: red;\n" +
+                "    }\n" +
+                "    .Failed:hover{\n" +
+                "        background-color: #cc0000;\n" +
+                "    }\n" +
+                "    .Passed{\n" +
+                "        background-color: green;\n" +
+                "    }\n" +
+                "   #summary1{\n"+
+                "      color: white;\n" +
+                "   }\n"+
+                "    .Passed:hover{\n" +
+                "        background-color: #00b300;\n" +
+                "    }\n" +
+                "    .bblue{\n" +
+                "        background-color: blue;\n" +
+                "    }\n" +
+                "    .Skipped{\n" +
+                "        background-color: gray;\n" +
+                "    }\n" +
+                "    .Skipped:hover{\n" +
+                "        background-color: #666666;\n" +
+                "    }\n" +
+                "    .Retried{\n" +
+                "        background-color: #e6e600;\n" +
+                "    }\n" +
+                "    .Retried:hover{\n" +
+                "        background-color: #cccc00;\n" +
+                "    }\n" +
+                "    .total{\n" +
+                "        background-color: #1ab2ff;\n" +
+                "    }\n" +
+                "    .total:hover{\n" +
+                "        background-color: #0099e6;\n" +
+                "    }\n" +
+                "    .fixTableHead thead th {\n" +
+                "        position: absolute;\n" +
+                "        top: 0;\n" +
+                "    }\n" +
+                "    .b {\n" +
+                "      border: 1px solid #ddd;\n" +
+                "    }\n" +
+                "    .modal {\n" +
+                "        position: fixed;\n" +
+                "        top: 0;\n" +
+                "        left: 0;\n" +
+                "        height: 100%;\n" +
+                "        width: 100%;\n" +
+                "        background-color: rgba(50,50,50,.7);\n" +
+                "        display: flex;\n" +
+                "        justify-content: center;\n" +
+                "        align-items: center;\n" +
+                "    }\n" +
+                "    .modal__window {\n" +
+                "      position: absolute;\n" +
+                "      background-color: white;\n" +
+                "      padding: 4em 2em;\n" +
+                "      height: auto%;\n" +
+                "      max-height: 80%;\n" +
+                "      width: 90%;\n" +
+                "      top:90px;\n" +
+                "    }\n" +
+                "    .modal__close {\n" +
+                "      position: absolute;\n" +
+                "      top: 30px;\n" +
+                "      right: 30px;\n" +
+                "      font-weight: 900;\n" +
+                "      font-size: 30px;\n" +
+                "      text-decoration: none;\n" +
+                "       color: #ff6600;\n" +
+                "    }\n" +
+                "    .modal:not(:target) {\n" +
+                "        visibility: hidden;\n" +
+                "        opacity: 0;\n" +
+                "    }\n" +
+                "    .im {\n" +
+                "        position: fixed;\n" +
+                "        top: 0;\n" +
+                "        left: 0;\n" +
+                "        height: 100%;\n" +
+                "        width: 100%;\n" +
+                "        background-color: rgba(0,0,0,.5);\n" +
+                "        display: flex;\n" +
+                "        justify-content: center;\n" +
+                "        align-items: center;\n" +
+                "    }\n" +
+                "    .im__window {\n" +
+                "      position: absolute;\n" +
+                "      background-color: white;\n" +
+                "      padding: 4em 2em;\n" +
+                "      height: auto%;\n" +
+                "      max-height: 80%;\n" +
+                "      width: 90%;\n" +
+                "      top:90px;\n" +
+                "    }\n" +
+                "    .im__close {\n" +
+                "      position: absolute;\n" +
+                "      top: 30px;\n" +
+                "      right: 30px;\n" +
+                "      font-weight: 900;\n" +
+                "      font-size: 30px;\n" +
+                "      text-decoration: none;\n" +
+                "       color: #ff6600;\n" +
+                "    }\n" +
+                "    .im:not(:target) {\n" +
+                "        visibility: hidden;\n" +
+                "        opacity: 0;\n" +
+                "    }\n" +
+
+                "\n" +
+                "    .fixTableHead thead th {\n" +
+                "        position: sticky;\n" +
+                "        top: 0;\n" +
+                "        }\n" +
+                "    table {\n" +
+                "        border-collapse: collapse;\n" +
+                "        width: 100%;\n" +
+                "        }\n" +
+                "    .collapsible {\n" +
+                "      cursor: pointer;\n" +
+                "      padding: 8px;\n" +
+                "      width: 98%;\n" +
+                "      border: none;\n" +
+                "      text-align: left;\n" +
+                "      outline: none;\n" +
+                "      font-size: 15px;\n" +
+                "      border: 1px solid #ddd;\n" +
+                "      background-color: #c68c53;\n" +
+                "    }\n" +
+                "    .active, .collapsible:hover {\n" +
+                "      background-color: #bf8040;\n" +
+                "    }\n" +
+                "    .content {\n" +
+                "      padding: 0 8px;\n" +
+                "      display: none;\n" +
+                "    }\n" +
+                "    .myImg {\n" +
+                "      border-radius: 5px;\n" +
+                "      cursor: pointer;\n" +
+                "      transition: 0.3s;\n" +
+                "    }\n" +
+                "    .myImg:hover {opacity: 0.7;}\n" +
+                "    .imodal {\n" +
+                "      display: none;\n" +
+                "      position: fixed;\n" +
+                "      z-index: 1;\n" +
+                "      padding-top: 50px;\n" +
+                "      left: 0;\n" +
+                "      top: 0;\n" +
+                "      width: 100%;\n" +
+                "      height: 100%;\n" +
+                "      overflow: auto;\n" +
+                "      background-color: rgb(0,0,0);\n" +
+                "      background-color: rgba(0,0,0,0.9);\n" +
+                "    }\n" +
+                "    .imodal-content {\n" +
+                "      margin: auto;\n" +
+                "      display: block;\n" +
+                "      width: 80%;\n" +
+                "      max-width: 700px;\n" +
+                "    }\n" +
+                "    .caption {\n" +
+                "      margin: auto;\n" +
+                "      display: block;\n" +
+                "      width: 80%;\n" +
+                "      max-width: 700px;\n" +
+                "      text-align: center;\n" +
+                "      color: #ccc;\n" +
+                "      padding: 8px 0;\n" +
+                "      height: 150px;\n" +
+                "    }\n" +
+                "    .imodal-content, #caption {\n" +
+                "      -webkit-animation-name: zoom;\n" +
+                "      -webkit-animation-duration: 0.6s;\n" +
+                "      animation-name: zoom;\n" +
+                "      animation-duration: 0.6s;\n" +
+                "    }\n" +
+                "    @-webkit-keyframes zoom {\n" +
+                "      from {-webkit-transform:scale(0)}\n" +
+                "      to {-webkit-transform:scale(1)}\n" +
+                "    }\n" +
+                "    @keyframes zoom {\n" +
+                "      from {transform:scale(0)}\n" +
+                "      to {transform:scale(1)}\n" +
+                "    }\n" +
+                "    .iclose {\n" +
+                "      position: absolute;\n" +
+                "      top: 15px;\n" +
+                "      right: 35px;\n" +
+                "      color: #f1f1f1;\n" +
+                "      font-size: 40px;\n" +
+                "      font-weight: bold;\n" +
+                "      transition: 0.3s;\n" +
+                "    }\n" +
+                "    .iclose:hover,\n" +
+                "    .icloseI:focus {\n" +
+                "      color: #bbb;\n" +
+                "      text-decoration: none;\n" +
+                "      cursor: pointer;\n" +
+                "    }\n" +
+                "    @media only screen and (max-width: 700px){\n" +
+                "      .modal-content {\n" +
+                "        width: 100%;\n" +
+                "      }\n" +
+                "    }\n" +
+                ".bord{\n" +
+                "    border: 1px solid #ddd;\n" +
+                "    width: 98%;\n" +
+                "    margin: auto;" +
+                "    padding-block: 5px;" +
+                "}" +
+                "" +
+                ".tooltip {\n" +
+                "  position: relative;\n" +
+                "  display: inline-block;\n" +
+                "  border-bottom: 1px dotted black;\n" +
+                "}\n" +
+                "\n" +
+                ".tooltip .tooltiptext {\n" +
+                "  visibility: hidden;\n" +
+                "  width: 120px;\n" +
+                "  background-color: #555;\n" +
+                "  color: #fff;\n" +
+                "  text-align: center;\n" +
+                "  border-radius: 6px;\n" +
+                "  padding: 5px 0;\n" +
+                "  position: absolute;\n" +
+                "  z-index: 1;\n" +
+                "  bottom: 125%;\n" +
+                "  left: 50%;\n" +
+                "  margin-left: -60px;\n" +
+                "  opacity: 0;\n" +
+                "  transition: opacity 0.3s;\n" +
+                "}\n" +
+                "\n" +
+                ".tooltip .tooltiptext::after {\n" +
+                "  content: \"\";\n" +
+                "  position: absolute;\n" +
+                "  top: 100%;\n" +
+                "  left: 50%;\n" +
+                "  margin-left: -5px;\n" +
+                "  border-width: 5px;\n" +
+                "  border-style: solid;\n" +
+                "  border-color: #555 transparent transparent transparent;\n" +
+                "}\n" +
+                "\n" +
+                ".tooltip:hover .tooltiptext {\n" +
+                "  visibility: visible;\n" +
+                "  opacity: 1;\n" +
+                "}" +
+                "" +
+                ""+
+                "    </style>\n" +
+                "    <title>Test Automation Report</title>\n" +
+                "</head>\n" +
+                "<body>";
+    }
+
+    private String reportHeadTable(){
+        return  "<table>\n" +
+                "    <tr>\n" +
+                "        <th colspan=\"3\"><h1>Automation Test Report</h1></th>\n" +
+                "    </tr>\n" +
+                "    <tr >\n" +
+                "        <td width=\"35%\">\n" +
+                "            <table class=\"rt btr p\">\n" +
+                "                <tr>\n" +
+                "                    <td>Executed on</td>\n" +
+                "                    <td>Grid</td>\n" +
+                "                </tr>\n" +
+                "                <tr>\n" +
+                "                    <td>Test Started</td>\n" +
+                "                    <td>Time</td>\n" +
+                "                </tr>\n" +
+                "                <tr>\n" +
+                "                    <td>User</td>\n" +
+                "                    <td>kamolesh</td>\n" +
+                "                </tr>\n" +
+                "                <tr>\n" +
+                "                    <td>Browser</td>\n" +
+                "                    <td>Chrome</td>\n" +
+                "                </tr>\n" +
+                "            </table>\n" +
+                "        </td>\n" +
+                "        <td width=\"30%\">\n" +
+                "            <div id=\"piechart_3d\" style=\"height: 300px;\"></div>\n" +
+                "        </td>\n" +
+                "        <td width=\"35%\">\n" +
+                "            <table class=\"rt btr p\">\n" +
+                "                <tr class=\"Passed\">\n" +
+                "                    <td>Passed</td>\n" +
+                "                    <td>"+totalPassedTests+"</td>\n" +
+                "                </tr>\n" +
+                "                <tr class=\"Skipped\">\n" +
+                "                    <td>Skipped</td>\n" +
+                "                    <td>"+totalSkippedTests+"</td>\n" +
+                "                </tr>\n" +
+                "                <tr class=\"Retried\">\n" +
+                "                    <td>Retried</td>\n" +
+                "                    <td>"+totalRetriedTests+"</td>\n" +
+                "                </tr>\n" +
+                "                <tr class=\"Failed\">\n" +
+                "                    <td>Failed</td>\n" +
+                "                    <td>"+totalFailedTests+"</td>\n" +
+                "                </tr>\n" +
+                "                <tr class=\"total\">\n" +
+                "                    <td>Total</td>\n" +
+                "                    <td>"+(totalPassedTests+totalFailedTests+totalSkippedTests)+"</td>\n" +
+                "                </tr>\n" +
+                "            </table>\n" +
+                "        </td>\n" +
+                "    </tr>\n" +
+                "</table>";
+    }
+
+
+    private StringBuilder summaryTable(){
+        StringBuilder summery = new StringBuilder();
+        summery.append("<div>\n" +
+                "    <h1 class=\"m\">Test Summary</h1>\n" +
+                "</div>\n" +
+                "\n" +
+                "<table class=\"rt btr p\" id=\"summary\">\n" +
+                "    <tr>\n" +
+                "        <th>Test Name</th>\n" +
+                "        <th># Passed</th>\n" +
+                "        <th># Skipped</th>\n" +
+                "        <th># Retried</th>\n" +
+                "        <th># Failed</th>\n" +
+                "        <th>Execution Time</th>\n" +
+                "        <th>Included Groups</th>\n" +
+                "        <th>Excluded Groups</th>\n" +
+                "    </tr>\n");
+
+        for (ReportListener.SuiteResult suiteResult : this.suiteResults) {
+            for (ReportListener.TestResult testResult : suiteResult.getTestResults()) {
+
+                int passedTests = testResult.getPassedTestCount();
+                int skippedTests = testResult.getSkippedTestCount();
+                int failedTests = testResult.getFailedTestCount();
+                int retriedTests = testResult.getRetriedTestCount();
+                long duration = testResult.getDuration();
+
+
+                long hours = TimeUnit.MILLISECONDS.toHours(duration);
+                long minutes = TimeUnit.MILLISECONDS.toMinutes(duration) % 60;
+                long seconds = TimeUnit.MILLISECONDS.toSeconds(duration) % 60;
+                long ms = TimeUnit.MILLISECONDS.toMillis(duration) % 60;
+
+                boolean hb = hours > 0;
+                boolean mb = minutes > 0;
+                boolean sb = seconds > 0;
+
+                String dl = "";
+
+                if (hb) {
+                    dl = hours + "H " + minutes + "m " + seconds + "s " + ms + " ms";
+                } else {
+                    if (mb) {
+                        dl = minutes + "m " + seconds + "s " + ms + " ms";
+                    } else {
+                        if (sb) {
+                            dl = seconds + "s " + ms + " ms";
+                        } else {
+                            dl = ms + "ms";
+                        }
+                    }
+                }
+
+
+                summery.append(
+                        "    <tr>\n" +
+                                "        <td>\n" +
+                                "            <a href=\"#"+testResult.getTestName()+"\"> "+testResult.getTestName()+"</a>\n" +
+                                "        </td>\n" +
+                                "        <td class=\"Passed\">"+passedTests+"</td>\n" +
+                                "        <td class=\"Skipped\">"+skippedTests+"</td>\n" +
+                                "        <td class=\"Retried\">"+retriedTests+"</td>\n" +
+                                "        <td class=\"Failed\">"+failedTests+"</td>\n" +
+                                "        <td class=\"\">"+dl+"</td>\n" +
+                                "        <td class=\"\"></td>\n" +
+                                "        <td class=\"\"></td>\n" +
+                                "    </tr>\n");
+
+                totalPassedTests += passedTests;
+                totalSkippedTests += skippedTests;
+                totalRetriedTests += retriedTests;
+                totalFailedTests += failedTests;
+
+            }
+        }
+
+
+
+
+        summery.append(
+                "    <tr>\n" +
+                        "        <td>\n" +
+                        "            <b> Total </b>\n" +
+                        "        </td>\n" +
+                        "        <td class=\"Passed\"><b></b>"+totalPassedTests+"</td>\n" +
+                        "        <td class=\"Skipped\"><b>"+totalSkippedTests+"</b></td>\n" +
+                        "        <td class=\"Retried\"><b>"+totalRetriedTests+"</b></td>\n" +
+                        "        <td class=\"Failed\"><b>"+totalFailedTests+"</b></td>\n" +
+                        "        <td class=\"\"><b></b></td>\n" +
+                        "        <td class=\"\"><b></b></td>\n" +
+                        "        <td class=\"\"><b></b></td>\n" +
+                        "    </tr>\n" +
+                        "</table>\n" );
+        return summery;
+    }
+    Map<String, ArrayList<ArrayList<String>>> data = new HashMap<>();
+
+    private StringBuilder details() {
+
+        int modelId = 0;
+
+        StringBuilder details = new StringBuilder();
+        details.append(
+                "<div> <div>\n" +
+                        "    <h1 class=\"m\">Test Details</h1>\n" +
+                        "</div>");
+
+        for (ReportListener.SuiteResult suiteResult : this.suiteResults) {
+            for (TestResult testResult : suiteResult.getTestResults()) {
+
+
+                System.out.println();
+
+
+                String testNAme = testResult.getTestName();
+
+
+            addData(testNAme, testResult.getFailedConfigurationResults(), "Failed");
+            addData(testNAme, testResult.getFailedTestResults(), "Failed");
+            addData(testNAme, testResult.getSkippedConfigurationResults(), "Skipped");
+            addData(testNAme, testResult.getSkippedTestResults(), "Skipped");
+            addData(testNAme, testResult.getRetriedTestResults(), "Retried");
+            addData(testNAme, testResult.getPassedTestResults(), "Passed");
+            }
+        }
+        Set<String> testSet = new HashSet<>();
+
+        for (String key : data.keySet()) {
+            key = key.substring(0, key.indexOf("|"));
+            testSet.add(key);
+        }
+
+        Map<String, ArrayList<ArrayList>> finalData = new HashMap<>();
+
+        for (String tn : testSet) {
+            finalData.put(tn, new ArrayList<>());
+        }
+
+
+        for (String key : data.keySet()) {
+            String tn = key.substring(0, key.indexOf("|"));
+            ArrayList<ArrayList<String>> a = data.get(key);
+            finalData.get(tn).add(a);
+        }
+
+                for (String key : finalData.keySet()) {
+
+                    ArrayList<ArrayList> data = finalData.get(key);
+
+                    details.append(
+                            "<div class=\"bord\">\n" +
+                                    "    <h2 class=\"m\" id=\""+key+"\">" + key + " Classes</h2>\n");
+
+
+
+                    Set<String> currentClassSet = new HashSet<>();
+
+                    for (int i = 0; i < data.size(); i++) {
+                        for( int f =0; f< data.get(i).size(); f++){
+                            ArrayList a = (ArrayList) data.get(i).get(f);
+                            currentClassSet.add(a.get(1).toString());
+                        }
+
+                    }
+
+                    Map<String, StringBuilder> classFilterMap = new HashMap<>();
+
+
+                    for (String classSet : currentClassSet) {
+                        classFilterMap.put(classSet, new StringBuilder());
+                    }
+
+
+                    for (ArrayList<ArrayList<String>> datum : data) {
+
+
+
+                        details.append(
+                                "    <div align=\"center\">\n" +
+                                        "        <div class=\"fixTableHead\">\n" +
+                                        "            <button type=\"button\" class=\"collapsible\">\n" +
+                                        "                <span> " + datum.get(1).get(1) + " </span>\n" +
+                                        "            </button>\n" +
+                                        "            <div class=\"content\">\n" +
+                                        "                <table id=\""+datum.get(1).get(1)+"\" class=\"rt btr p\">\n" +
+                                        "                    <tr>\n" +
+                                        "                        <th width=40%>Test Method</th>\n" +
+                                        "                        <th width=20%>Start at</th>\n" +
+                                        "                        <th width=20%>Duration</th>\n" +
+                                        "                        <th width=20%>Status</th>\n" +
+                                        "                    </tr>\n");
+
+                        for(int i =0; i <datum.size(); i++) {
+
+
+                            details.append(
+                                    "                    <tr class=\""+datum.get(i).get(5)+"\">\n" +
+                                            "                        <td>\n" +
+                                            "                            <div>\n" +
+                                            "                                <div>\n" +
+                                            "                                    <a href=\"#modal"+modelId+"\">" + datum.get(i).get(2) + "</a>\n" +
+                                            "                                </div>\n" +
+                                            "                                <div id=\"modal"+modelId+"\" class=\"modal\">\n" +
+                                            "                                    <div class=\"modal__window\">\n" +
+                                            "                                        <a class=\"modal__close\" href=\"#1\">X</a>\n" +
+                                            "                                        <h1>"+datum.get(i).get(2)+"</h1>\n" +
+                                            "                                        <div class=\"fixTableHead\">\n" +
+                                            "                                            <table class=\"\">\n" +
+                                            "                                                <tr>\n" +
+                                            "                                                    <th>TS No.</th>\n" +
+                                            "                                                    <th>Test Step</th>\n" +
+                                            "                                                    <th>Test Data</th>\n" +
+                                            "                                                    <th>Expected</th>\n" +
+                                            "                                                    <th>Actual</th>\n" +
+                                            "                                                    <th>Screenshot</th>\n" +
+                                            "                                                    <th>Result</th>\n" +
+                                            "                                                </tr>\n" +
+                                            "                                                <tr>\n" +
+                                            "                                                    <td></td>\n" +
+                                            "                                                    <td></td>\n" +
+                                            "                                                    <td>"+datum.get(i).get(6)+"</td>\n" +
+                                            "                                                    <td></td>\n" +
+                                            "                                                    <td>"+datum.get(i).get(7)+"</td>\n" +
+                                            "                                                    <td>\n" +
+                                            "                                                        <div>\n" +
+                                            "                                                            <img id=\"myImg\" class=\"myImg\" src=\"img_snow.jpg\" alt=\"Snow\"\n" +
+                                            "                                                                 style=\"width:100%;max-width:300px\">\n" +
+                                            "                                                            <div id=\"myModal\" class=\"imodal\">\n" +
+                                            "                                                                <span class=\"iclose\">&times;</span>\n" +
+                                            "                                                                <img class=\"imodal-content\" id=\"img01\">\n" +
+                                            "                                                                <div id=\"caption\"></div>\n" +
+                                            "                                                            </div>\n" +
+                                            "                                                            <script>\n" +
+                                            "                                                                    var modal = document.getElementById(\"myModal\");\n" +
+                                            "                                                                    var img = document.getElementById(\"myImg\");\n" +
+                                            "                                                                    var modalImg = document.getElementById(\"img01\");\n" +
+                                            "                                                                    var captionText = document.getElementById(\"caption\");\n" +
+                                            "                                                                    img.onclick = function(){\n" +
+                                            "                                                                      modal.style.display = \"block\";\n" +
+                                            "                                                                      modalImg.src = this.src;\n" +
+                                            "                                                                      captionText.innerHTML = this.alt;\n" +
+                                            "                                                                    }\n" +
+                                            "                                                                    var span = document.getElementsByClassName(\"iclose\")[0];\n" +
+                                            "                                                                    span.onclick = function() {\n" +
+                                            "                                                                      modal.style.display = \"none\";\n" +
+                                            "                                                                    }\n" +
+                                            "                                                            </script>\n" +
+                                            "                                                        </div>\n" +
+                                            "                                                    </td>\n" +
+                                            "                                                    <td>"+datum.get(i).get(5)+"</td>\n" +
+                                            "                                                </tr>\n" +
+                                            "                                            </table>\n" +
+                                            "                                        </div>\n" +
+                                            "                                    </div>\n" +
+                                            "                                </div>\n" +
+                                            "                            </div>\n" +
+                                            "                        </td>\n" +
+                                            "                        <td>Test</td>\n" +
+                                            "                        <td>"+datum.get(i).get(4)+"</td>\n" +
+                                            "                        <td>"+datum.get(i).get(5)+"</td>\n" +
+                                            "                    </tr>\n");
+                            modelId ++;
+
+                        }
+                        details.append(
+                                "                </table>\n" +
+                                        "            </div>\n" +
+                                        "        </div>\n" +
+                                        "    </div>\n");
+
+
+
+                    }
+                    details.append(
+                            "</div><br>");
+        }
+        details.append(
+                "</div>");
+
+        return details;
+    }
+
+    private String end(){
+        return "<br><br>\n" +
+                "<script>\n" +
+                "        var coll = document.getElementsByClassName(\"collapsible\");\n" +
+                "        var i;\n" +
+                "\n" +
+                "        for (i = 0; i < coll.length; i++) {\n" +
+                "          coll[i].addEventListener(\"click\", function() {\n" +
+                "            this.classList.toggle(\"active\");\n" +
+                "            var content = this.nextElementSibling;\n" +
+                "            if (content.style.display === \"block\") {\n" +
+                "              content.style.display = \"none\";\n" +
+                "            } else {\n" +
+                "              content.style.display = \"block\";\n" +
+                "            }\n" +
+                "          });\n" +
+                "        }\n" +
+                "</script>\n" +
+                "</body>\n" +
+                "</html>";
+    }
+
+
+    private void addData(String testNAme, List<ClassResult> classResults, String status){
+
+        for(ClassResult classResult : classResults){
+            String currentClassName = classResult.getClassName();
+            String dataName = testNAme+"|"+currentClassName;
+
+            for(MethodResult methodResult :classResult.getMethodResults()){
+
+                List<ITestResult> results = methodResult.getResults();
+
+                for(ITestResult result: results) {
+
+                    System.out.println("============="+result.getName()+"   "+result.getInstanceName()+""+result.getTestName());
+                    if (!data.containsKey(dataName)) {
+                        data.put(dataName, new ArrayList<>());
+                    }
+
+                    ArrayList<String> currentClassData = new ArrayList<>();
+                    currentClassData.add(0, testNAme);
+                    currentClassData.add(1, currentClassName);
+                    currentClassData.add(2, result.getName());
+                    currentClassData.add(3, "Start at");
+                    currentClassData.add(4, "Duration");
+                    currentClassData.add(5, status);
+
+                    Object parameters[] = result.getParameters();
+                    String pv = "";
+                    for(Object parameter : parameters ){
+                        pv += parameter.toString()+"    ";
+                    }
+
+                    currentClassData.add(6, pv);
+                    Throwable throwable = result.getThrowable();
+                    String tv = "";
+                    if (throwable != null) {
+                        StringWriter sw = new StringWriter();
+                        PrintWriter pw = new PrintWriter(sw);
+                        throwable.printStackTrace(pw);
+                        String ex = sw.toString();
+
+                        if(ex.length() > 15){
+
+                            String tt = ex.substring(0,20)+"....";
+
+                            tv = "<body style=\"text-align:center;\">\n" +
+                                    "<div class=\"tooltip\"> "+tt+" \n" +
+                                    "  <span class=\"tooltiptext\">"+ex+"</span>\n" +
+                                    "</div>";
+
+                        }
+
+
+                    }
+                    currentClassData.add(7, tv);
+
+                    data.get(dataName).add(currentClassData);
+                }
+            }
+
+
+        }
+    }
+
+    public void writeToFile(String html) throws IOException {
+        String filePath = System.getProperty("user.dir")+"/target/report";
+        File file = new File(filePath+"/Report.html");
+
+        if(!file.exists()){
+
+            Files.createDirectories(Paths.get(filePath));
+
+            file = new File(filePath+"/Report.html");
+        }
+
+        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file));
+
+        bufferedWriter.write(html);
+
+        bufferedWriter.close();
+        Desktop.getDesktop().open(file);
+    }
+
+    protected static class SuiteResult {
+        private final String suiteName;
+        private final List<ReportListener.TestResult> testResults = Lists.newArrayList();
+        private final XmlSuite.ParallelMode mode;
+
+        public SuiteResult(ISuite suite) {
+            this.suiteName = suite.getName();
+            this.mode = suite.getXmlSuite().getParallel();
+            Iterator var2 = suite.getResults().values().iterator();
+
+            while(var2.hasNext()) {
+                ISuiteResult suiteResult = (ISuiteResult)var2.next();
+                this.testResults.add(new TestResult(suiteResult.getTestContext()));
+            }
+
+        }
+
+        public String getSuiteName() {
+            return this.suiteName;
+        }
+
+        public List<ReportListener.TestResult> getTestResults() {
+            return this.testResults;
+        }
+
+        public XmlSuite.ParallelMode getParallelMode() {
+            return this.mode;
+        }
+    }
+
+    protected static class TestResult {
+        protected static final Comparator<ITestResult> RESULT_COMPARATOR = Comparator.comparing((ITestResult result) -> {
+            return result.getTestClass().getName();
+        }).thenComparing((ITestResult result) -> {
+            return result.getMethod().getMethodName();
+        });
+
+
+
+        private final String testName;
+        private final List<ReportListener.ClassResult> failedConfigurationResults;
+        private final List<ReportListener.ClassResult> failedTestResults;
+        private final List<ReportListener.ClassResult> skippedConfigurationResults;
+        private final List<ReportListener.ClassResult> skippedTestResults;
+        private final List<ReportListener.ClassResult> retriedTestResults;
+        private final List<ReportListener.ClassResult> passedTestResults;
+        private final int failedTestCount;
+        private final int retriedTestCount;
+        private final int skippedTestCount;
+        private final int passedTestCount;
+        private final long duration;
+        private final String includedGroups;
+        private final String excludedGroups;
+
+        public TestResult(ITestContext context) {
+            this.testName = context.getName();
+            Set<ITestResult> failedConfigurations = context.getFailedConfigurations().getAllResults();
+            Set<ITestResult> failedTests = context.getFailedTests().getAllResults();
+            Set<ITestResult> skippedConfigurations = context.getSkippedConfigurations().getAllResults();
+            Set<ITestResult> rawSkipped = context.getSkippedTests().getAllResults();
+            Set<ITestResult> skippedTests = pruneSkipped(rawSkipped);
+            Set<ITestResult> retriedTests = pruneRetried(rawSkipped);
+            Set<ITestResult> passedTests = context.getPassedTests().getAllResults();
+            this.failedConfigurationResults = this.groupResults(failedConfigurations);
+            this.failedTestResults = this.groupResults(failedTests);
+            this.skippedConfigurationResults = this.groupResults(skippedConfigurations);
+            this.skippedTestResults = this.groupResults(skippedTests);
+            this.retriedTestResults = this.groupResults(retriedTests);
+            this.passedTestResults = this.groupResults(passedTests);
+            this.failedTestCount = failedTests.size();
+            this.retriedTestCount = retriedTests.size();
+            this.skippedTestCount = skippedTests.size();
+            this.passedTestCount = passedTests.size();
+            this.duration = context.getEndDate().getTime() - context.getStartDate().getTime();
+            this.includedGroups = this.formatGroups(context.getIncludedGroups());
+            this.excludedGroups = this.formatGroups(context.getExcludedGroups());
+        }
+
+        private static Set<ITestResult> pruneSkipped(Set<ITestResult> results) {
+            return (Set)results.stream().filter((result) -> {
+                return !result.wasRetried();
+            }).collect(Collectors.toSet());
+        }
+
+        private static Set<ITestResult> pruneRetried(Set<ITestResult> results) {
+            return (Set)results.stream().filter(ITestResult::wasRetried).collect(Collectors.toSet());
+        }
+
+        protected List<ReportListener.ClassResult> groupResults(Set<ITestResult> results) {
+            List<ReportListener.ClassResult> classResults = Lists.newArrayList();
+            if (!results.isEmpty()) {
+                List<ReportListener.MethodResult> resultsPerClass = Lists.newArrayList();
+                List<ITestResult> resultsPerMethod = Lists.newArrayList();
+                List<ITestResult> resultsList = Lists.newArrayList(results);
+                resultsList.sort(RESULT_COMPARATOR);
+                Iterator<ITestResult> resultsIterator = resultsList.iterator();
+                if (!resultsIterator.hasNext()) {
+                    throw new IllegalStateException("There should have been at-least 1 result");
+                }
+
+                ITestResult result = (ITestResult)resultsIterator.next();
+                resultsPerMethod.add(result);
+                String previousClassName = result.getTestClass().getName();
+
+                for(String previousMethodName = result.getMethod().getMethodName(); resultsIterator.hasNext(); resultsPerMethod.add(result)) {
+                    result = (ITestResult)resultsIterator.next();
+                    String className = result.getTestClass().getName();
+                    if (!previousClassName.equals(className)) {
+                        if (resultsPerMethod.isEmpty()) {
+                            throw new IllegalStateException("Results per method should NOT have been empty");
+                        }
+
+                        resultsPerClass.add(new MethodResult(resultsPerMethod));
+                        resultsPerMethod = Lists.newArrayList();
+                        classResults.add(new ClassResult(previousClassName, resultsPerClass));
+                        resultsPerClass = Lists.newArrayList();
+                        previousClassName = className;
+                        previousMethodName = result.getMethod().getMethodName();
+                    } else {
+                        String methodName = result.getMethod().getMethodName();
+                        if (!previousMethodName.equals(methodName)) {
+                            if (resultsPerMethod.isEmpty()) {
+                                throw new IllegalStateException("Results per method should NOT have been empty");
+                            }
+
+                            resultsPerClass.add(new MethodResult(resultsPerMethod));
+                            resultsPerMethod = Lists.newArrayList();
+                            previousMethodName = methodName;
+                        }
+                    }
+                }
+
+                if (resultsPerMethod.isEmpty()) {
+                    throw new IllegalStateException("Results per method should NOT have been empty");
+                }
+
+                resultsPerClass.add(new MethodResult(resultsPerMethod));
+                classResults.add(new ClassResult(previousClassName, resultsPerClass));
+            }
+
+            return classResults;
+        }
+
+        public String getTestName() {
+            return this.testName;
+        }
+
+        public List<ReportListener.ClassResult> getFailedConfigurationResults() {
+            return this.failedConfigurationResults;
+        }
+
+        public List<ReportListener.ClassResult> getFailedTestResults() {
+            return this.failedTestResults;
+        }
+
+        public List<ReportListener.ClassResult> getSkippedConfigurationResults() {
+            return this.skippedConfigurationResults;
+        }
+
+        public List<ReportListener.ClassResult> getSkippedTestResults() {
+            return this.skippedTestResults;
+        }
+
+        public List<ReportListener.ClassResult> getRetriedTestResults() {
+            return this.retriedTestResults;
+        }
+
+        public List<ReportListener.ClassResult> getPassedTestResults() {
+            return this.passedTestResults;
+        }
+
+        public int getFailedTestCount() {
+            return this.failedTestCount;
+        }
+
+        public int getSkippedTestCount() {
+            return this.skippedTestCount;
+        }
+
+        public int getRetriedTestCount() {
+            return this.retriedTestCount;
+        }
+
+        public int getPassedTestCount() {
+            return this.passedTestCount;
+        }
+
+        public long getDuration() {
+            return this.duration;
+        }
+
+        public String getIncludedGroups() {
+            return this.includedGroups;
+        }
+
+        public String getExcludedGroups() {
+            return this.excludedGroups;
+        }
+
+        protected String formatGroups(String[] groups) {
+            if (groups.length == 0) {
+                return "";
+            } else {
+                StringBuilder builder = new StringBuilder();
+                builder.append(groups[0]);
+
+                for(int i = 1; i < groups.length; ++i) {
+                    builder.append(", ").append(groups[i]);
+                }
+
+                return builder.toString();
+            }
+        }
+    }
+
+    protected static class ClassResult {
+        private final String className;
+        private final List<ReportListener.MethodResult> methodResults;
+
+        public ClassResult(String className, List<ReportListener.MethodResult> methodResults) {
+            this.className = className;
+            this.methodResults = methodResults;
+        }
+
+        public String getClassName() {
+            return this.className;
+        }
+
+        public List<ReportListener.MethodResult> getMethodResults() {
+            return this.methodResults;
+        }
+    }
+
+    protected static class MethodResult {
+        private final List<ITestResult> results;
+
+        public MethodResult(List<ITestResult> results) {
+            this.results = results;
+        }
+
+        public List<ITestResult> getResults() {
+            return this.results;
+        }
+    }
+
+}
+
+        </code>
+
+    </body>
+</html>
