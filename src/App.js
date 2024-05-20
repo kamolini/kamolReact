@@ -1,5 +1,4 @@
 import './App.css';
-import Student from './Student';
 import Footer from './components/Footer';
 import Profile from './components/Profile';
 
@@ -9,7 +8,6 @@ function App() {
       <header className="App-header">
       <Profile/>
       </header>
-      
       
       <Footer/>
     </div>
